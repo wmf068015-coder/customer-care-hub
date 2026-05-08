@@ -9,6 +9,17 @@ import { BookPlus, ExternalLink } from "lucide-react";
 import { AddToKnowledgeDialog } from "@/components/knowledge/AddToKnowledgeDialog";
 import { useKnowledgeStore, statusForSource, type ReviewStatus } from "@/lib/knowledge-store";
 
+function KbStatus({ status }: { status: ReviewStatus | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const cls =
+    status === "已通过"
+      ? "bg-success/15 text-success hover:bg-success/15"
+      : status === "已驳回"
+        ? "bg-destructive/15 text-destructive hover:bg-destructive/15"
+        : "bg-warning/15 text-warning hover:bg-warning/15";
+  return <Badge className={cls}>{status}</Badge>;
+}
+
 export const Route = createFileRoute("/sessions")({ component: Page });
 
 const sessions = Array.from({ length: 12 }).map((_, i) => ({
