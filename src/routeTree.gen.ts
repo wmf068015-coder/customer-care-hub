@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TransferRouteImport } from './routes/transfer'
+import { Route as TicketsRouteImport } from './routes/tickets'
 import { Route as SessionsRouteImport } from './routes/sessions'
 import { Route as SatisfactionRouteImport } from './routes/satisfaction'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
@@ -18,6 +19,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TransferRoute = TransferRouteImport.update({
   id: '/transfer',
   path: '/transfer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TicketsRoute = TicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SessionsRoute = SessionsRouteImport.update({
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/knowledge': typeof KnowledgeRoute
   '/satisfaction': typeof SatisfactionRoute
   '/sessions': typeof SessionsRoute
+  '/tickets': typeof TicketsRoute
   '/transfer': typeof TransferRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRoute
   '/satisfaction': typeof SatisfactionRoute
   '/sessions': typeof SessionsRoute
+  '/tickets': typeof TicketsRoute
   '/transfer': typeof TransferRoute
 }
 export interface FileRoutesById {
@@ -61,19 +69,33 @@ export interface FileRoutesById {
   '/knowledge': typeof KnowledgeRoute
   '/satisfaction': typeof SatisfactionRoute
   '/sessions': typeof SessionsRoute
+  '/tickets': typeof TicketsRoute
   '/transfer': typeof TransferRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/knowledge' | '/satisfaction' | '/sessions' | '/transfer'
+  fullPaths:
+    | '/'
+    | '/knowledge'
+    | '/satisfaction'
+    | '/sessions'
+    | '/tickets'
+    | '/transfer'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/knowledge' | '/satisfaction' | '/sessions' | '/transfer'
+  to:
+    | '/'
+    | '/knowledge'
+    | '/satisfaction'
+    | '/sessions'
+    | '/tickets'
+    | '/transfer'
   id:
     | '__root__'
     | '/'
     | '/knowledge'
     | '/satisfaction'
     | '/sessions'
+    | '/tickets'
     | '/transfer'
   fileRoutesById: FileRoutesById
 }
@@ -82,6 +104,7 @@ export interface RootRouteChildren {
   KnowledgeRoute: typeof KnowledgeRoute
   SatisfactionRoute: typeof SatisfactionRoute
   SessionsRoute: typeof SessionsRoute
+  TicketsRoute: typeof TicketsRoute
   TransferRoute: typeof TransferRoute
 }
 
@@ -92,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/transfer'
       fullPath: '/transfer'
       preLoaderRoute: typeof TransferRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tickets': {
+      id: '/tickets'
+      path: '/tickets'
+      fullPath: '/tickets'
+      preLoaderRoute: typeof TicketsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sessions': {
@@ -130,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   KnowledgeRoute: KnowledgeRoute,
   SatisfactionRoute: SatisfactionRoute,
   SessionsRoute: SessionsRoute,
+  TicketsRoute: TicketsRoute,
   TransferRoute: TransferRoute,
 }
 export const routeTree = rootRouteImport
