@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookPlus, Sparkles } from "lucide-react";
+import { addKnowledgeEntry } from "@/lib/knowledge-store";
 
 export type KnowledgeSource = {
   id: string;
@@ -72,9 +73,20 @@ export function AddToKnowledgeDialog({
     }
     setSubmitting(true);
     await new Promise((r) => setTimeout(r, 500));
+    const cat = categories.find((c) => c.id === category)!;
+    addKnowledgeEntry({
+      sourceIds: sources.map((s) => s.id),
+      sourceType: first.type,
+      category: cat.id,
+      categoryName: cat.name,
+      title,
+      summary,
+      content,
+      tags,
+    });
     setSubmitting(false);
     onOpenChange(false);
-    toast.success(`已提交至「${categories.find((c) => c.id === category)?.name}」审核中`, {
+    toast.success(`已提交至「${cat.name}」审核中`, {
       description: `共 ${sources.length} 条记录沉淀，置信度初始 60，待审核后生效`,
     });
   };
