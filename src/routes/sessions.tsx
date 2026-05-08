@@ -7,6 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BookPlus, ExternalLink } from "lucide-react";
 import { AddToKnowledgeDialog } from "@/components/knowledge/AddToKnowledgeDialog";
+import { useKnowledgeStore, statusForSource, type ReviewStatus } from "@/lib/knowledge-store";
+
+function KbStatus({ status }: { status: ReviewStatus | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const cls =
+    status === "已通过"
+      ? "bg-success/15 text-success hover:bg-success/15"
+      : status === "已驳回"
+        ? "bg-destructive/15 text-destructive hover:bg-destructive/15"
+        : "bg-warning/15 text-warning hover:bg-warning/15";
+  return <Badge className={cls}>{status}</Badge>;
+}
 
 export const Route = createFileRoute("/sessions")({ component: Page });
 
@@ -24,6 +36,7 @@ const sessions = Array.from({ length: 12 }).map((_, i) => ({
 function Page() {
   const [selected, setSelected] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
+  const entries = useKnowledgeStore();
   const toggle = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   const allSelected = selected.length === sessions.length;
   return (
@@ -54,6 +67,7 @@ function Page() {
               <TableHead>会话 ID</TableHead><TableHead>用户</TableHead><TableHead>渠道</TableHead>
               <TableHead>主题</TableHead><TableHead>处理客服</TableHead><TableHead>时长</TableHead>
               <TableHead>开始时间</TableHead><TableHead>状态</TableHead>
+              <TableHead>知识库</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -70,6 +84,7 @@ function Page() {
                 <TableCell>
                   <Badge className={s.status === "进行中" ? "bg-info/15 text-info hover:bg-info/15" : "bg-muted text-muted-foreground hover:bg-muted"}>{s.status}</Badge>
                 </TableCell>
+                <TableCell><KbStatus status={statusForSource(s.id, entries)} /></TableCell>
               </TableRow>
             ))}
           </TableBody>

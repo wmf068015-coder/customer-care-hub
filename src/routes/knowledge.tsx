@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Plus, RefreshCw, Search, Trash2, ArrowDownToLine, Replace } from "lucide-react";
+import { Plus, RefreshCw, Search, Trash2, ArrowDownToLine, Replace, Check, X } from "lucide-react";
+import { useKnowledgeStore, setEntryStatus, type ReviewStatus } from "@/lib/knowledge-store";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/knowledge")({ component: Page });
 
@@ -29,6 +31,16 @@ const items = Array.from({ length: 10 }).map((_, i) => ({
 
 function Page() {
   const [active, setActive] = useState("product");
+  const entries = useKnowledgeStore();
+  const inCategory = entries.filter((e) => e.category === active);
+  const pending = inCategory.filter((e) => e.status === "审核中");
+  const approved = inCategory.filter((e) => e.status === "已通过");
+  const rejected = inCategory.filter((e) => e.status === "已驳回");
+
+  const review = (id: string, status: ReviewStatus) => {
+    setEntryStatus(id, status);
+    toast.success(status === "已通过" ? "已通过并备份至知识库" : "已驳回该知识");
+  };
   return (
     <div>
       <PageHeader
@@ -70,6 +82,11 @@ function Page() {
               <TabsTrigger value="knowledge">知识</TabsTrigger>
               <TabsTrigger value="faq">FAQ</TabsTrigger>
               <TabsTrigger value="ticket">工单记录</TabsTrigger>
+              <TabsTrigger value="pending" className="gap-1">
+                审核中{pending.length > 0 && <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-warning/20 text-warning text-[10px] font-medium">{pending.length}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="approved">已通过{approved.length > 0 && ` (${approved.length})`}</TabsTrigger>
+              <TabsTrigger value="rejected">已驳回{rejected.length > 0 && ` (${rejected.length})`}</TabsTrigger>
             </TabsList>
             <TabsContent value="all">
               <Table>
@@ -111,6 +128,101 @@ function Page() {
             <TabsContent value="knowledge"><div className="py-12 text-center text-sm text-muted-foreground">仅显示知识类目</div></TabsContent>
             <TabsContent value="faq"><div className="py-12 text-center text-sm text-muted-foreground">仅显示 FAQ</div></TabsContent>
             <TabsContent value="ticket"><div className="py-12 text-center text-sm text-muted-foreground">仅显示工单记录</div></TabsContent>
+
+            <TabsContent value="pending">
+              {pending.length === 0 ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">暂无待审核知识</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead><TableHead>标题</TableHead>
+                      <TableHead>来源</TableHead><TableHead>提交时间</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pending.map((e) => (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-mono text-xs">{e.id}</TableCell>
+                        <TableCell className="font-medium">
+                          <div>{e.title}</div>
+                          <div className="text-xs text-muted-foreground line-clamp-1">{e.summary}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{e.sourceType === "session" ? "会话" : "工单"} × {e.sourceIds.length}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{e.submittedAt}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" className="h-8 gap-1 bg-success hover:bg-success/90 text-white" onClick={() => review(e.id, "已通过")}>
+                              <Check className="w-3 h-3" />通过
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-8 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => review(e.id, "已驳回")}>
+                              <X className="w-3 h-3" />驳回
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+
+            <TabsContent value="approved">
+              {approved.length === 0 ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">暂无已通过备份</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead><TableHead>标题</TableHead>
+                      <TableHead>来源</TableHead><TableHead>审核时间</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {approved.map((e) => (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-mono text-xs">{e.id}</TableCell>
+                        <TableCell className="font-medium">{e.title}</TableCell>
+                        <TableCell><Badge variant="outline">{e.sourceType === "session" ? "会话" : "工单"} × {e.sourceIds.length}</Badge></TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{e.reviewedAt}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+
+            <TabsContent value="rejected">
+              {rejected.length === 0 ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">暂无驳回记录</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead><TableHead>标题</TableHead>
+                      <TableHead>来源</TableHead><TableHead>审核时间</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rejected.map((e) => (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-mono text-xs">{e.id}</TableCell>
+                        <TableCell className="font-medium">{e.title}</TableCell>
+                        <TableCell><Badge variant="outline">{e.sourceType === "session" ? "会话" : "工单"} × {e.sourceIds.length}</Badge></TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{e.reviewedAt}</TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => review(e.id, "审核中")}>重新提审</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
           </Tabs>
         </div>
       </div>
