@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TransferRouteImport } from './routes/transfer'
+import { Route as SessionsRouteImport } from './routes/sessions'
 import { Route as SatisfactionRouteImport } from './routes/satisfaction'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,6 +18,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TransferRoute = TransferRouteImport.update({
   id: '/transfer',
   path: '/transfer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionsRoute = SessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SatisfactionRoute = SatisfactionRouteImport.update({
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/knowledge': typeof KnowledgeRoute
   '/satisfaction': typeof SatisfactionRoute
+  '/sessions': typeof SessionsRoute
   '/transfer': typeof TransferRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/knowledge': typeof KnowledgeRoute
   '/satisfaction': typeof SatisfactionRoute
+  '/sessions': typeof SessionsRoute
   '/transfer': typeof TransferRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,28 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/knowledge': typeof KnowledgeRoute
   '/satisfaction': typeof SatisfactionRoute
+  '/sessions': typeof SessionsRoute
   '/transfer': typeof TransferRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/knowledge' | '/satisfaction' | '/transfer'
+  fullPaths: '/' | '/knowledge' | '/satisfaction' | '/sessions' | '/transfer'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/knowledge' | '/satisfaction' | '/transfer'
-  id: '__root__' | '/' | '/knowledge' | '/satisfaction' | '/transfer'
+  to: '/' | '/knowledge' | '/satisfaction' | '/sessions' | '/transfer'
+  id:
+    | '__root__'
+    | '/'
+    | '/knowledge'
+    | '/satisfaction'
+    | '/sessions'
+    | '/transfer'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   KnowledgeRoute: typeof KnowledgeRoute
   SatisfactionRoute: typeof SatisfactionRoute
+  SessionsRoute: typeof SessionsRoute
   TransferRoute: typeof TransferRoute
 }
 
@@ -76,6 +92,13 @@ declare module '@tanstack/react-router' {
       path: '/transfer'
       fullPath: '/transfer'
       preLoaderRoute: typeof TransferRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sessions': {
+      id: '/sessions'
+      path: '/sessions'
+      fullPath: '/sessions'
+      preLoaderRoute: typeof SessionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/satisfaction': {
@@ -106,6 +129,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   KnowledgeRoute: KnowledgeRoute,
   SatisfactionRoute: SatisfactionRoute,
+  SessionsRoute: SessionsRoute,
   TransferRoute: TransferRoute,
 }
 export const routeTree = rootRouteImport
