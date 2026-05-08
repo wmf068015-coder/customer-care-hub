@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TransferRouteImport } from './routes/transfer'
+import { Route as SatisfactionRouteImport } from './routes/satisfaction'
 import { Route as IndexRouteImport } from './routes/index'
 
 const TransferRoute = TransferRouteImport.update({
   id: '/transfer',
   path: '/transfer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SatisfactionRoute = SatisfactionRouteImport.update({
+  id: '/satisfaction',
+  path: '/satisfaction',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,27 +31,31 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/satisfaction': typeof SatisfactionRoute
   '/transfer': typeof TransferRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/satisfaction': typeof SatisfactionRoute
   '/transfer': typeof TransferRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/satisfaction': typeof SatisfactionRoute
   '/transfer': typeof TransferRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/transfer'
+  fullPaths: '/' | '/satisfaction' | '/transfer'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/transfer'
-  id: '__root__' | '/' | '/transfer'
+  to: '/' | '/satisfaction' | '/transfer'
+  id: '__root__' | '/' | '/satisfaction' | '/transfer'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SatisfactionRoute: typeof SatisfactionRoute
   TransferRoute: typeof TransferRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/transfer'
       fullPath: '/transfer'
       preLoaderRoute: typeof TransferRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/satisfaction': {
+      id: '/satisfaction'
+      path: '/satisfaction'
+      fullPath: '/satisfaction'
+      preLoaderRoute: typeof SatisfactionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SatisfactionRoute: SatisfactionRoute,
   TransferRoute: TransferRoute,
 }
 export const routeTree = rootRouteImport
