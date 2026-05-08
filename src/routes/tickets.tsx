@@ -7,6 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BookPlus, Link2 } from "lucide-react";
 import { AddToKnowledgeDialog } from "@/components/knowledge/AddToKnowledgeDialog";
+import { useKnowledgeStore, statusForSource, type ReviewStatus } from "@/lib/knowledge-store";
+
+function KbStatus({ status }: { status: ReviewStatus | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const cls =
+    status === "已通过"
+      ? "bg-success/15 text-success hover:bg-success/15"
+      : status === "已驳回"
+        ? "bg-destructive/15 text-destructive hover:bg-destructive/15"
+        : "bg-warning/15 text-warning hover:bg-warning/15";
+  return <Badge className={cls}>{status}</Badge>;
+}
 
 export const Route = createFileRoute("/tickets")({ component: Page });
 
@@ -28,6 +40,7 @@ const priorityCls: Record<string, string> = {
 function Page() {
   const [selected, setSelected] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
+  const entries = useKnowledgeStore();
   const toggle = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   return (
     <div>
@@ -50,6 +63,7 @@ function Page() {
               <TableHead className="w-10"></TableHead>
               <TableHead>工单号</TableHead><TableHead>主题</TableHead><TableHead>优先级</TableHead>
               <TableHead>状态</TableHead><TableHead>负责人</TableHead><TableHead>创建时间</TableHead>
+              <TableHead>知识库</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -62,6 +76,7 @@ function Page() {
                 <TableCell><Badge variant="outline">{t.status}</Badge></TableCell>
                 <TableCell>{t.assignee}</TableCell>
                 <TableCell className="text-muted-foreground">{t.created}</TableCell>
+                <TableCell><KbStatus status={statusForSource(t.id, entries)} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
