@@ -155,7 +155,7 @@ function Page() {
                         <TableCell className="text-muted-foreground text-xs">{e.submittedAt}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Button size="sm" className="h-8 gap-1 bg-success hover:bg-success/90 text-success-foreground" onClick={() => review(e.id, "已通过")}>
+                            <Button size="sm" className="h-8 gap-1 bg-success hover:bg-success/90 text-white" onClick={() => review(e.id, "已通过")}>
                               <Check className="w-3 h-3" />通过
                             </Button>
                             <Button size="sm" variant="outline" className="h-8 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => review(e.id, "已驳回")}>
