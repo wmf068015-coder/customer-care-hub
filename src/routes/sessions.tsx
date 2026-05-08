@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BookPlus, ExternalLink } from "lucide-react";
+import { AddToKnowledgeDialog } from "@/components/knowledge/AddToKnowledgeDialog";
 
 export const Route = createFileRoute("/sessions")({ component: Page });
 
@@ -22,6 +23,7 @@ const sessions = Array.from({ length: 12 }).map((_, i) => ({
 
 function Page() {
   const [selected, setSelected] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
   const toggle = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   const allSelected = selected.length === sessions.length;
   return (
@@ -36,7 +38,7 @@ function Page() {
                 <ExternalLink className="w-4 h-4" />打开客服工作台
               </a>
             </Button>
-            <Button disabled={selected.length === 0} className="gap-2">
+            <Button disabled={selected.length === 0} className="gap-2" onClick={() => setOpen(true)}>
               <BookPlus className="w-4 h-4" />加入知识库 {selected.length > 0 && `(${selected.length})`}
             </Button>
           </>
@@ -73,6 +75,13 @@ function Page() {
           </TableBody>
         </Table>
       </div>
+      <AddToKnowledgeDialog
+        open={open}
+        onOpenChange={setOpen}
+        sources={sessions
+          .filter((s) => selected.includes(s.id))
+          .map((s) => ({ id: s.id, title: s.topic, summary: `${s.user} 通过${s.channel}发起，处理人 ${s.agent}，时长 ${s.duration}`, channel: s.channel, type: "session" as const }))}
+      />
     </div>
   );
 }
