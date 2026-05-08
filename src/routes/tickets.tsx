@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BookPlus, Link2 } from "lucide-react";
+import { AddToKnowledgeDialog } from "@/components/knowledge/AddToKnowledgeDialog";
 
 export const Route = createFileRoute("/tickets")({ component: Page });
 
@@ -26,6 +27,7 @@ const priorityCls: Record<string, string> = {
 
 function Page() {
   const [selected, setSelected] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
   const toggle = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   return (
     <div>
@@ -35,7 +37,7 @@ function Page() {
         actions={
           <>
             <Button variant="outline" className="gap-2"><Link2 className="w-4 h-4" />连接工单系统</Button>
-            <Button disabled={selected.length === 0} className="gap-2">
+            <Button disabled={selected.length === 0} className="gap-2" onClick={() => setOpen(true)}>
               <BookPlus className="w-4 h-4" />加入知识库 {selected.length > 0 && `(${selected.length})`}
             </Button>
           </>
@@ -65,6 +67,13 @@ function Page() {
           </TableBody>
         </Table>
       </div>
+      <AddToKnowledgeDialog
+        open={open}
+        onOpenChange={setOpen}
+        sources={tickets
+          .filter((t) => selected.includes(t.id))
+          .map((t) => ({ id: t.id, title: t.subject, summary: `优先级 ${t.priority} · 状态 ${t.status} · 负责人 ${t.assignee}`, type: "ticket" as const }))}
+      />
     </div>
   );
 }
