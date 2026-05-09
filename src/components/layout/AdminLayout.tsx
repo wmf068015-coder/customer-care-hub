@@ -13,12 +13,12 @@ import {
 import { Input } from "@/components/ui/input";
 
 const nav = [
-  { to: "/", label: "接待总览", icon: LayoutDashboard },
+  { to: "/", label: "后台运营总览", icon: LayoutDashboard },
   { to: "/transfer", label: "转人工统计", icon: UserCheck },
   { to: "/satisfaction", label: "满意度评价", icon: Smile },
   { to: "/knowledge", label: "知识库管理", icon: BookOpen },
-  { to: "/sessions", label: "客服对话入库管理", icon: MessagesSquare },
-  { to: "/tickets", label: "工单入库管理", icon: Ticket },
+  { to: "/sessions", label: "对话审核入库", icon: MessagesSquare },
+  { to: "/tickets", label: "ERP 工单入库", icon: Ticket },
 ] as const;
 
 export function AdminLayout() {
@@ -27,11 +27,14 @@ export function AdminLayout() {
     <div className="flex min-h-screen bg-background">
       <aside className="w-64 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col">
         <div className="px-6 py-5 flex items-center gap-2 border-b border-sidebar-border">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "var(--gradient-primary)" }}>
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center"
+            style={{ background: "var(--gradient-primary)" }}
+          >
             <Bot className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <div className="font-semibold tracking-tight">后台管理系统</div>
+            <div className="font-semibold tracking-tight">知识库后台</div>
             <div className="text-[11px] text-sidebar-foreground/60">Admin Console</div>
           </div>
         </div>
@@ -55,7 +58,7 @@ export function AdminLayout() {
           })}
         </nav>
         <div className="px-4 py-4 border-t border-sidebar-border text-xs text-sidebar-foreground/50">
-          v1.0 · 智能客服系统
+          v1.0 · 客服知识后台
         </div>
       </aside>
       <div className="flex-1 flex flex-col min-w-0">

@@ -3,9 +3,25 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { FilterBar } from "@/components/dashboard/FilterBar";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { UserCheck, Bot, ArrowRightLeft, MousePointerClick, Headphones, Zap, Frown, AlertCircle } from "lucide-react";
+import {
+  UserCheck,
+  Bot,
+  ArrowRightLeft,
+  MousePointerClick,
+  Headphones,
+  Zap,
+  Frown,
+  AlertCircle,
+} from "lucide-react";
 
 export const Route = createFileRoute("/transfer")({ component: TransferPage });
 
@@ -26,9 +42,21 @@ function TransferPage() {
       <FilterBar />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        <StatCard label="转人工会话总数" value="1,990" delta={5.2} icon={UserCheck} accent="primary" />
+        <StatCard
+          label="转人工会话总数"
+          value="1,990"
+          delta={5.2}
+          icon={UserCheck}
+          accent="primary"
+        />
         <StatCard label="机器人触发转人工" value="1,254" delta={3.8} icon={Bot} accent="info" />
-        <StatCard label="直接转人工" value="736" delta={-1.4} icon={ArrowRightLeft} accent="warning" />
+        <StatCard
+          label="直接转人工"
+          value="736"
+          delta={-1.4}
+          icon={ArrowRightLeft}
+          accent="warning"
+        />
       </div>
 
       <Tabs defaultValue="active" className="mb-6">
@@ -38,7 +66,12 @@ function TransferPage() {
         </TabsList>
         <TabsContent value="active" className="mt-4">
           <div className="grid grid-cols-2 gap-4">
-            <StatCard label="主动点击转人工" value="736" icon={MousePointerClick} accent="primary" />
+            <StatCard
+              label="主动点击转人工"
+              value="736"
+              icon={MousePointerClick}
+              accent="primary"
+            />
             <StatCard label="人工响应数" value="682" icon={Headphones} accent="success" />
           </div>
         </TabsContent>
@@ -58,8 +91,13 @@ function TransferPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>会话 ID</TableHead><TableHead>用户</TableHead><TableHead>渠道</TableHead>
-              <TableHead>转人工类型</TableHead><TableHead>原因</TableHead><TableHead>时间</TableHead><TableHead>状态</TableHead>
+              <TableHead>会话 ID</TableHead>
+              <TableHead>用户</TableHead>
+              <TableHead>渠道</TableHead>
+              <TableHead>转人工类型</TableHead>
+              <TableHead>原因</TableHead>
+              <TableHead>时间</TableHead>
+              <TableHead>状态</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -68,11 +106,23 @@ function TransferPage() {
                 <TableCell className="font-mono text-xs">{r.id}</TableCell>
                 <TableCell>{r.user}</TableCell>
                 <TableCell>{r.channel}</TableCell>
-                <TableCell><Badge variant={r.type === "机器人触发" ? "secondary" : "outline"}>{r.type}</Badge></TableCell>
+                <TableCell>
+                  <Badge variant={r.type === "机器人触发" ? "secondary" : "outline"}>
+                    {r.type}
+                  </Badge>
+                </TableCell>
                 <TableCell className="text-muted-foreground">{r.reason}</TableCell>
                 <TableCell className="text-muted-foreground">{r.time}</TableCell>
                 <TableCell>
-                  <Badge className={r.status === "已响应" ? "bg-success/15 text-success hover:bg-success/15" : "bg-warning/15 text-warning hover:bg-warning/15"}>{r.status}</Badge>
+                  <Badge
+                    className={
+                      r.status === "已响应"
+                        ? "bg-success/15 text-success hover:bg-success/15"
+                        : "bg-warning/15 text-warning hover:bg-warning/15"
+                    }
+                  >
+                    {r.status}
+                  </Badge>
                 </TableCell>
               </TableRow>
             ))}

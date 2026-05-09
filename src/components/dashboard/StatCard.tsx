@@ -27,13 +27,17 @@ export function StatCard({
           <div className="text-3xl font-semibold mt-2 tracking-tight">{value}</div>
         </div>
         {Icon && (
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${accentMap[accent]}`}>
+          <div
+            className={`w-10 h-10 rounded-lg flex items-center justify-center ${accentMap[accent]}`}
+          >
             <Icon className="w-5 h-5" />
           </div>
         )}
       </div>
       {delta !== undefined && (
-        <div className={`mt-3 text-xs flex items-center gap-1 ${delta >= 0 ? "text-success" : "text-destructive"}`}>
+        <div
+          className={`mt-3 text-xs flex items-center gap-1 ${delta >= 0 ? "text-success" : "text-destructive"}`}
+        >
           {delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
           {Math.abs(delta)}% 较上周期
         </div>

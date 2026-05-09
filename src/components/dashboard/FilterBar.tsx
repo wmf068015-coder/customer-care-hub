@@ -14,7 +14,11 @@ const CHANNELS = [
   { id: "shopify", label: "Shopify" },
 ] as const;
 
-export function FilterBar({ onChange }: { onChange?: (f: { range?: DateRange; channels: string[] }) => void }) {
+export function FilterBar({
+  onChange,
+}: {
+  onChange?: (f: { range?: DateRange; channels: string[] }) => void;
+}) {
   const [range, setRange] = useState<DateRange | undefined>({
     from: new Date(Date.now() - 7 * 86400000),
     to: new Date(),
@@ -48,7 +52,15 @@ export function FilterBar({ onChange }: { onChange?: (f: { range?: DateRange; ch
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar mode="range" selected={range} onSelect={(r) => { setRange(r); onChange?.({ range: r, channels }); }} numberOfMonths={2} />
+          <Calendar
+            mode="range"
+            selected={range}
+            onSelect={(r) => {
+              setRange(r);
+              onChange?.({ range: r, channels });
+            }}
+            numberOfMonths={2}
+          />
         </PopoverContent>
       </Popover>
       <div className="h-6 w-px bg-border" />
