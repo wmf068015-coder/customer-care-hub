@@ -1,102 +1,132 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BookPlus, ExternalLink } from "lucide-react";
-import { AddToKnowledgeDialog } from "@/components/knowledge/AddToKnowledgeDialog";
-import { useKnowledgeStore, statusForSource, type ReviewStatus } from "@/lib/knowledge-store";
-
-function KbStatus({ status }: { status: ReviewStatus | null }) {
-  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
-  const cls =
-    status === "已通过"
-      ? "bg-success/15 text-success hover:bg-success/15"
-      : status === "已驳回"
-        ? "bg-destructive/15 text-destructive hover:bg-destructive/15"
-        : "bg-warning/15 text-warning hover:bg-warning/15";
-  return <Badge className={cls}>{status}</Badge>;
-}
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Check, X, ExternalLink, RotateCcw } from "lucide-react";
+import { useKnowledgeStore, setEntryStatus, type ReviewStatus, type KnowledgeEntry } from "@/lib/knowledge-store";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/sessions")({ component: Page });
 
-const sessions = Array.from({ length: 12 }).map((_, i) => ({
-  id: `S${30000 + i}`,
-  user: `客户 ${2048 + i}`,
-  channel: ["桌面网站", "移动网站", "Shopify"][i % 3],
-  topic: ["退款进度查询", "物流时效咨询", "产品规格问题", "优惠券使用", "账户登录异常"][i % 5],
-  agent: ["AI 客服", "Lisa", "Mike", "AI 客服"][i % 4],
-  status: ["已结束", "进行中", "已结束"][i % 3],
-  duration: `${3 + (i % 12)}m ${10 + i}s`,
-  time: `2026-05-08 1${i % 9}:30`,
-}));
-
 function Page() {
-  const [selected, setSelected] = useState<string[]>([]);
-  const [open, setOpen] = useState(false);
-  const entries = useKnowledgeStore();
-  const toggle = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
-  const allSelected = selected.length === sessions.length;
+  const all = useKnowledgeStore().filter((e) => e.sourceType === "session");
+  const pending = all.filter((e) => e.status === "审核中");
+  const rejected = all.filter((e) => e.status === "已驳回");
+  const approved = all.filter((e) => e.status === "已通过");
+
+  const review = (id: string, status: ReviewStatus) => {
+    setEntryStatus(id, status);
+    toast.success(status === "已通过" ? "已通过并备份至知识库" : status === "已驳回" ? "已驳回该入库申请" : "已重新提交审核");
+  };
+
   return (
     <div>
       <PageHeader
-        title="客服会话管理"
-        description="管理 AI 与人工客服的所有会话记录，可批量加入知识库"
+        title="客服对话入库管理"
+        description="审核客服工作台回传的对话入库申请，通过后自动备份至知识库"
         actions={
-          <>
-            <Button variant="outline" asChild className="gap-2">
-              <a href="https://zen-desk-assist.lovable.app/" target="_blank" rel="noreferrer">
-                <ExternalLink className="w-4 h-4" />打开客服工作台
-              </a>
-            </Button>
-            <Button disabled={selected.length === 0} className="gap-2" onClick={() => setOpen(true)}>
-              <BookPlus className="w-4 h-4" />加入知识库 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          </>
+          <Button variant="outline" asChild className="gap-2">
+            <a href="https://zen-desk-assist.lovable.app/" target="_blank" rel="noreferrer">
+              <ExternalLink className="w-4 h-4" />打开客服工作台
+            </a>
+          </Button>
         }
       />
-      <div className="bg-card rounded-lg border shadow-[var(--shadow-card)]">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
-                <Checkbox checked={allSelected} onCheckedChange={(c) => setSelected(c ? sessions.map((s) => s.id) : [])} />
-              </TableHead>
-              <TableHead>会话 ID</TableHead><TableHead>用户</TableHead><TableHead>渠道</TableHead>
-              <TableHead>主题</TableHead><TableHead>处理客服</TableHead><TableHead>时长</TableHead>
-              <TableHead>开始时间</TableHead><TableHead>状态</TableHead>
-              <TableHead>知识库</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sessions.map((s) => (
-              <TableRow key={s.id} className={selected.includes(s.id) ? "bg-primary/5" : ""}>
-                <TableCell><Checkbox checked={selected.includes(s.id)} onCheckedChange={() => toggle(s.id)} /></TableCell>
-                <TableCell className="font-mono text-xs">{s.id}</TableCell>
-                <TableCell>{s.user}</TableCell>
-                <TableCell><Badge variant="outline">{s.channel}</Badge></TableCell>
-                <TableCell className="font-medium">{s.topic}</TableCell>
-                <TableCell>{s.agent}</TableCell>
-                <TableCell className="text-muted-foreground">{s.duration}</TableCell>
-                <TableCell className="text-muted-foreground">{s.time}</TableCell>
-                <TableCell>
-                  <Badge className={s.status === "进行中" ? "bg-info/15 text-info hover:bg-info/15" : "bg-muted text-muted-foreground hover:bg-muted"}>{s.status}</Badge>
-                </TableCell>
-                <TableCell><KbStatus status={statusForSource(s.id, entries)} /></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="bg-card rounded-lg border shadow-[var(--shadow-card)] p-4">
+        <Tabs defaultValue="pending">
+          <TabsList>
+            <TabsTrigger value="pending" className="gap-1">
+              待审核{pending.length > 0 && <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-warning/20 text-warning text-[10px] font-medium">{pending.length}</span>}
+            </TabsTrigger>
+            <TabsTrigger value="rejected">已驳回{rejected.length > 0 && ` (${rejected.length})`}</TabsTrigger>
+            <TabsTrigger value="approved">已通过{approved.length > 0 && ` (${approved.length})`}</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending">
+            <PendingTable rows={pending} onPass={(id) => review(id, "已通过")} onReject={(id) => review(id, "已驳回")} />
+          </TabsContent>
+          <TabsContent value="rejected">
+            <HistoryTable rows={rejected} variant="rejected" onRestore={(id) => review(id, "审核中")} />
+          </TabsContent>
+          <TabsContent value="approved">
+            <HistoryTable rows={approved} variant="approved" />
+          </TabsContent>
+        </Tabs>
       </div>
-      <AddToKnowledgeDialog
-        open={open}
-        onOpenChange={setOpen}
-        sources={sessions
-          .filter((s) => selected.includes(s.id))
-          .map((s) => ({ id: s.id, title: s.topic, summary: `${s.user} 通过${s.channel}发起，处理人 ${s.agent}，时长 ${s.duration}`, channel: s.channel, type: "session" as const }))}
-      />
     </div>
+  );
+}
+
+function PendingTable({ rows, onPass, onReject }: { rows: KnowledgeEntry[]; onPass: (id: string) => void; onReject: (id: string) => void }) {
+  if (rows.length === 0) return <div className="py-12 text-center text-sm text-muted-foreground">暂无待审核入库申请</div>;
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>申请 ID</TableHead><TableHead>标题 / 摘要</TableHead><TableHead>类目</TableHead>
+          <TableHead>来源会话</TableHead><TableHead>提交时间</TableHead>
+          <TableHead className="text-right">操作</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((e) => (
+          <TableRow key={e.id}>
+            <TableCell className="font-mono text-xs">{e.id}</TableCell>
+            <TableCell>
+              <div className="font-medium">{e.title}</div>
+              <div className="text-xs text-muted-foreground line-clamp-1">{e.summary}</div>
+            </TableCell>
+            <TableCell><Badge variant="outline">{e.categoryName}</Badge></TableCell>
+            <TableCell className="font-mono text-xs text-muted-foreground">{e.sourceIds.join(", ")}</TableCell>
+            <TableCell className="text-muted-foreground text-xs">{e.submittedAt}</TableCell>
+            <TableCell className="text-right">
+              <div className="flex justify-end gap-1">
+                <Button size="sm" className="h-8 gap-1 bg-success hover:bg-success/90 text-white" onClick={() => onPass(e.id)}>
+                  <Check className="w-3 h-3" />通过
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => onReject(e.id)}>
+                  <X className="w-3 h-3" />驳回
+                </Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function HistoryTable({ rows, variant, onRestore }: { rows: KnowledgeEntry[]; variant: "approved" | "rejected"; onRestore?: (id: string) => void }) {
+  if (rows.length === 0) return <div className="py-12 text-center text-sm text-muted-foreground">{variant === "approved" ? "暂无已通过入库记录" : "暂无驳回记录"}</div>;
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>申请 ID</TableHead><TableHead>标题</TableHead><TableHead>类目</TableHead>
+          <TableHead>来源会话</TableHead><TableHead>审核时间</TableHead>
+          {onRestore && <TableHead className="text-right">操作</TableHead>}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((e) => (
+          <TableRow key={e.id}>
+            <TableCell className="font-mono text-xs">{e.id}</TableCell>
+            <TableCell className="font-medium">{e.title}</TableCell>
+            <TableCell><Badge variant="outline">{e.categoryName}</Badge></TableCell>
+            <TableCell className="font-mono text-xs text-muted-foreground">{e.sourceIds.join(", ")}</TableCell>
+            <TableCell className="text-muted-foreground text-xs">{e.reviewedAt ?? "—"}</TableCell>
+            {onRestore && (
+              <TableCell className="text-right">
+                <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => onRestore(e.id)}>
+                  <RotateCcw className="w-3 h-3" />重新提审
+                </Button>
+              </TableCell>
+            )}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

@@ -17,8 +17,8 @@ const nav = [
   { to: "/transfer", label: "转人工统计", icon: UserCheck },
   { to: "/satisfaction", label: "满意度评价", icon: Smile },
   { to: "/knowledge", label: "知识库管理", icon: BookOpen },
-  { to: "/sessions", label: "客服会话", icon: MessagesSquare },
-  { to: "/tickets", label: "工单管理", icon: Ticket },
+  { to: "/sessions", label: "客服对话入库管理", icon: MessagesSquare },
+  { to: "/tickets", label: "工单入库管理", icon: Ticket },
 ] as const;
 
 export function AdminLayout() {
@@ -31,8 +31,8 @@ export function AdminLayout() {
             <Bot className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <div className="font-semibold tracking-tight">AI 客服后台</div>
-            <div className="text-[11px] text-sidebar-foreground/60">Service Console</div>
+            <div className="font-semibold tracking-tight">后台管理系统</div>
+            <div className="text-[11px] text-sidebar-foreground/60">Admin Console</div>
           </div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">

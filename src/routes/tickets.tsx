@@ -1,94 +1,130 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BookPlus, Link2 } from "lucide-react";
-import { AddToKnowledgeDialog } from "@/components/knowledge/AddToKnowledgeDialog";
-import { useKnowledgeStore, statusForSource, type ReviewStatus } from "@/lib/knowledge-store";
-
-function KbStatus({ status }: { status: ReviewStatus | null }) {
-  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
-  const cls =
-    status === "已通过"
-      ? "bg-success/15 text-success hover:bg-success/15"
-      : status === "已驳回"
-        ? "bg-destructive/15 text-destructive hover:bg-destructive/15"
-        : "bg-warning/15 text-warning hover:bg-warning/15";
-  return <Badge className={cls}>{status}</Badge>;
-}
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Check, X, Link2, RotateCcw } from "lucide-react";
+import { useKnowledgeStore, setEntryStatus, type ReviewStatus, type KnowledgeEntry } from "@/lib/knowledge-store";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/tickets")({ component: Page });
 
-const tickets = Array.from({ length: 10 }).map((_, i) => ({
-  id: `#TK-${5000 + i}`,
-  subject: ["订单未发货跟进", "退款迟迟未到账", "商品损坏理赔", "重复扣款问题", "无法登录账户"][i % 5],
-  priority: ["高", "中", "低"][i % 3],
-  status: ["处理中", "待回复", "已关闭"][i % 3],
-  assignee: ["Lisa", "Mike", "Anna", "John"][i % 4],
-  created: `2026-05-0${(i % 8) + 1}`,
-}));
-
-const priorityCls: Record<string, string> = {
-  高: "bg-destructive/15 text-destructive hover:bg-destructive/15",
-  中: "bg-warning/15 text-warning hover:bg-warning/15",
-  低: "bg-muted text-muted-foreground hover:bg-muted",
-};
-
 function Page() {
-  const [selected, setSelected] = useState<string[]>([]);
-  const [open, setOpen] = useState(false);
-  const entries = useKnowledgeStore();
-  const toggle = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+  const all = useKnowledgeStore().filter((e) => e.sourceType === "ticket");
+  const pending = all.filter((e) => e.status === "审核中");
+  const rejected = all.filter((e) => e.status === "已驳回");
+  const approved = all.filter((e) => e.status === "已通过");
+
+  const review = (id: string, status: ReviewStatus) => {
+    setEntryStatus(id, status);
+    toast.success(status === "已通过" ? "已通过并备份至知识库" : status === "已驳回" ? "已驳回该工单入库申请" : "已重新提交审核");
+  };
+
   return (
     <div>
       <PageHeader
-        title="工单管理"
-        description="对接外部工单系统，可批量将工单沉淀进知识库"
+        title="工单入库管理"
+        description="审核 ERP 系统回传的工单对话入库申请，通过后自动备份至知识库"
         actions={
-          <>
-            <Button variant="outline" className="gap-2"><Link2 className="w-4 h-4" />连接工单系统</Button>
-            <Button disabled={selected.length === 0} className="gap-2" onClick={() => setOpen(true)}>
-              <BookPlus className="w-4 h-4" />加入知识库 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          </>
+          <Button variant="outline" className="gap-2">
+            <Link2 className="w-4 h-4" />连接 ERP 工单系统
+          </Button>
         }
       />
-      <div className="bg-card rounded-lg border shadow-[var(--shadow-card)]">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10"></TableHead>
-              <TableHead>工单号</TableHead><TableHead>主题</TableHead><TableHead>优先级</TableHead>
-              <TableHead>状态</TableHead><TableHead>负责人</TableHead><TableHead>创建时间</TableHead>
-              <TableHead>知识库</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tickets.map((t) => (
-              <TableRow key={t.id} className={selected.includes(t.id) ? "bg-primary/5" : ""}>
-                <TableCell><Checkbox checked={selected.includes(t.id)} onCheckedChange={() => toggle(t.id)} /></TableCell>
-                <TableCell className="font-mono text-xs">{t.id}</TableCell>
-                <TableCell className="font-medium">{t.subject}</TableCell>
-                <TableCell><Badge className={priorityCls[t.priority]}>{t.priority}</Badge></TableCell>
-                <TableCell><Badge variant="outline">{t.status}</Badge></TableCell>
-                <TableCell>{t.assignee}</TableCell>
-                <TableCell className="text-muted-foreground">{t.created}</TableCell>
-                <TableCell><KbStatus status={statusForSource(t.id, entries)} /></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="bg-card rounded-lg border shadow-[var(--shadow-card)] p-4">
+        <Tabs defaultValue="pending">
+          <TabsList>
+            <TabsTrigger value="pending" className="gap-1">
+              待审核{pending.length > 0 && <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-warning/20 text-warning text-[10px] font-medium">{pending.length}</span>}
+            </TabsTrigger>
+            <TabsTrigger value="rejected">已驳回{rejected.length > 0 && ` (${rejected.length})`}</TabsTrigger>
+            <TabsTrigger value="approved">已通过{approved.length > 0 && ` (${approved.length})`}</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending">
+            <PendingTable rows={pending} onPass={(id) => review(id, "已通过")} onReject={(id) => review(id, "已驳回")} />
+          </TabsContent>
+          <TabsContent value="rejected">
+            <HistoryTable rows={rejected} variant="rejected" onRestore={(id) => review(id, "审核中")} />
+          </TabsContent>
+          <TabsContent value="approved">
+            <HistoryTable rows={approved} variant="approved" />
+          </TabsContent>
+        </Tabs>
       </div>
-      <AddToKnowledgeDialog
-        open={open}
-        onOpenChange={setOpen}
-        sources={tickets
-          .filter((t) => selected.includes(t.id))
-          .map((t) => ({ id: t.id, title: t.subject, summary: `优先级 ${t.priority} · 状态 ${t.status} · 负责人 ${t.assignee}`, type: "ticket" as const }))}
-      />
     </div>
+  );
+}
+
+function PendingTable({ rows, onPass, onReject }: { rows: KnowledgeEntry[]; onPass: (id: string) => void; onReject: (id: string) => void }) {
+  if (rows.length === 0) return <div className="py-12 text-center text-sm text-muted-foreground">暂无待审核工单入库申请</div>;
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>申请 ID</TableHead><TableHead>标题 / 摘要</TableHead><TableHead>类目</TableHead>
+          <TableHead>来源工单</TableHead><TableHead>提交时间</TableHead>
+          <TableHead className="text-right">操作</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((e) => (
+          <TableRow key={e.id}>
+            <TableCell className="font-mono text-xs">{e.id}</TableCell>
+            <TableCell>
+              <div className="font-medium">{e.title}</div>
+              <div className="text-xs text-muted-foreground line-clamp-1">{e.summary}</div>
+            </TableCell>
+            <TableCell><Badge variant="outline">{e.categoryName}</Badge></TableCell>
+            <TableCell className="font-mono text-xs text-muted-foreground">{e.sourceIds.join(", ")}</TableCell>
+            <TableCell className="text-muted-foreground text-xs">{e.submittedAt}</TableCell>
+            <TableCell className="text-right">
+              <div className="flex justify-end gap-1">
+                <Button size="sm" className="h-8 gap-1 bg-success hover:bg-success/90 text-white" onClick={() => onPass(e.id)}>
+                  <Check className="w-3 h-3" />通过
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => onReject(e.id)}>
+                  <X className="w-3 h-3" />驳回
+                </Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function HistoryTable({ rows, variant, onRestore }: { rows: KnowledgeEntry[]; variant: "approved" | "rejected"; onRestore?: (id: string) => void }) {
+  if (rows.length === 0) return <div className="py-12 text-center text-sm text-muted-foreground">{variant === "approved" ? "暂无已通过入库记录" : "暂无驳回记录"}</div>;
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>申请 ID</TableHead><TableHead>标题</TableHead><TableHead>类目</TableHead>
+          <TableHead>来源工单</TableHead><TableHead>审核时间</TableHead>
+          {onRestore && <TableHead className="text-right">操作</TableHead>}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((e) => (
+          <TableRow key={e.id}>
+            <TableCell className="font-mono text-xs">{e.id}</TableCell>
+            <TableCell className="font-medium">{e.title}</TableCell>
+            <TableCell><Badge variant="outline">{e.categoryName}</Badge></TableCell>
+            <TableCell className="font-mono text-xs text-muted-foreground">{e.sourceIds.join(", ")}</TableCell>
+            <TableCell className="text-muted-foreground text-xs">{e.reviewedAt ?? "—"}</TableCell>
+            {onRestore && (
+              <TableCell className="text-right">
+                <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => onRestore(e.id)}>
+                  <RotateCcw className="w-3 h-3" />重新提审
+                </Button>
+              </TableCell>
+            )}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
