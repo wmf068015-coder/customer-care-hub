@@ -158,6 +158,7 @@ function seed() {
   ticketSeeds.forEach((t, i) => {
     const c = cats[t.cat];
     const convAt = ts(i + 2);
+    const ex = ticketExtras[i];
     list.push({
       id: `K${++seq}`,
       sourceIds: [`TK-${6100 + i}`],
@@ -173,6 +174,12 @@ function seed() {
       reviewedAt: i < 2 ? ts(i) : undefined,
       submitter: t.submitter,
       conversationAt: convAt,
+      ticketType: ex?.ticketType,
+      productCategory: ex?.productCategory,
+      productModel: ex?.productModel,
+      applicant: ex?.applicant,
+      handler: ex?.handler,
+      attachments: ex?.attachments,
       messages: [
         { role: "system", name: "ERP", time: convAt, text: `工单已创建：${t.title}` },
         { role: "user", name: t.customer, time: convAt, text: t.q },
