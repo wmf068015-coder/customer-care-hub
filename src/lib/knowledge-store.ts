@@ -26,6 +26,13 @@ export type KnowledgeEntry = {
   submitter?: string;
   conversationAt?: string;
   messages?: DialogMessage[];
+  // Ticket-specific extra fields
+  ticketType?: string;
+  productCategory?: string;
+  productModel?: string;
+  applicant?: string; // 提单人
+  handler?: string;   // 处理人
+  attachments?: { name: string; size: string }[];
 };
 
 let entries: KnowledgeEntry[] = [];
@@ -103,11 +110,19 @@ const ticketSeeds = [
   { title: "App 闪退技术排查", summary: "ERP 工单：iOS 17 升级后部分机型闪退。", cat: 5, submitter: "ERP · 技术工单", customer: "客户 #76310", q: "升级 iOS 17 后 App 一打开就闪退。", a: "已定位为兼容性问题，请升级到最新版 v3.2.1，或临时使用网页版访问。" },
 ];
 
+// Deterministic timestamps to avoid SSR/CSR hydration mismatch
 function ts(daysAgo: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().slice(0, 16).replace("T", " ");
+  const base = new Date("2026-05-09T10:00:00Z");
+  base.setUTCDate(base.getUTCDate() - daysAgo);
+  return base.toISOString().slice(0, 16).replace("T", " ");
 }
+
+const ticketExtras = [
+  { ticketType: "退款工单", productCategory: "智能音箱", productModel: "SoundOne Pro", applicant: "客户 #88231", handler: "财务 · 周敏", attachments: [{ name: "重复扣款流水.pdf", size: "128 KB" }, { name: "订单截图.png", size: "342 KB" }] },
+  { ticketType: "理赔工单", productCategory: "智能手表", productModel: "WatchX 2", applicant: "客户 #91002", handler: "售后 · 何洁", attachments: [{ name: "开箱视频.mp4", size: "8.6 MB" }, { name: "破损照片.jpg", size: "1.2 MB" }] },
+  { ticketType: "物流加急", productCategory: "无线耳机", productModel: "AirBuds 3", applicant: "VIP #V0421", handler: "物流 · 赵宇", attachments: [{ name: "VIP 凭证.png", size: "210 KB" }] },
+  { ticketType: "技术工单", productCategory: "移动 App", productModel: "iOS v3.2.0", applicant: "客户 #76310", handler: "技术 · 钱伟", attachments: [{ name: "崩溃日志.txt", size: "44 KB" }] },
+];
 
 let seeded = false;
 function seed() {
@@ -143,6 +158,7 @@ function seed() {
   ticketSeeds.forEach((t, i) => {
     const c = cats[t.cat];
     const convAt = ts(i + 2);
+    const ex = ticketExtras[i];
     list.push({
       id: `K${++seq}`,
       sourceIds: [`TK-${6100 + i}`],
@@ -158,6 +174,12 @@ function seed() {
       reviewedAt: i < 2 ? ts(i) : undefined,
       submitter: t.submitter,
       conversationAt: convAt,
+      ticketType: ex?.ticketType,
+      productCategory: ex?.productCategory,
+      productModel: ex?.productModel,
+      applicant: ex?.applicant,
+      handler: ex?.handler,
+      attachments: ex?.attachments,
       messages: [
         { role: "system", name: "ERP", time: convAt, text: `工单已创建：${t.title}` },
         { role: "user", name: t.customer, time: convAt, text: t.q },
