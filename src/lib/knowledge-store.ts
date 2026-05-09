@@ -26,6 +26,13 @@ export type KnowledgeEntry = {
   submitter?: string;
   conversationAt?: string;
   messages?: DialogMessage[];
+  // Ticket-specific extra fields
+  ticketType?: string;
+  productCategory?: string;
+  productModel?: string;
+  applicant?: string; // 提单人
+  handler?: string;   // 处理人
+  attachments?: { name: string; size: string }[];
 };
 
 let entries: KnowledgeEntry[] = [];
