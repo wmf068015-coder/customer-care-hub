@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Check, X, ExternalLink, RotateCcw } from "lucide-react";
 import { useKnowledgeStore, setEntryStatus, type ReviewStatus, type KnowledgeEntry } from "@/lib/knowledge-store";
 import { toast } from "sonner";
+import { EntryDetailDialog } from "@/components/knowledge/EntryDetailDialog";
 
 export const Route = createFileRoute("/sessions")({ component: Page });
 
@@ -15,6 +17,7 @@ function Page() {
   const pending = all.filter((e) => e.status === "审核中");
   const rejected = all.filter((e) => e.status === "已驳回");
   const approved = all.filter((e) => e.status === "已通过");
+  const [detail, setDetail] = useState<KnowledgeEntry | null>(null);
 
   const review = (id: string, status: ReviewStatus) => {
     setEntryStatus(id, status);
@@ -45,21 +48,22 @@ function Page() {
           </TabsList>
 
           <TabsContent value="pending">
-            <PendingTable rows={pending} onPass={(id) => review(id, "已通过")} onReject={(id) => review(id, "已驳回")} />
+            <PendingTable rows={pending} onPass={(id) => review(id, "已通过")} onReject={(id) => review(id, "已驳回")} onView={setDetail} />
           </TabsContent>
           <TabsContent value="rejected">
-            <HistoryTable rows={rejected} variant="rejected" onRestore={(id) => review(id, "审核中")} />
+            <HistoryTable rows={rejected} variant="rejected" onRestore={(id) => review(id, "审核中")} onView={setDetail} />
           </TabsContent>
           <TabsContent value="approved">
-            <HistoryTable rows={approved} variant="approved" />
+            <HistoryTable rows={approved} variant="approved" onView={setDetail} />
           </TabsContent>
         </Tabs>
       </div>
+      <EntryDetailDialog entry={detail} open={!!detail} onOpenChange={(v) => !v && setDetail(null)} />
     </div>
   );
 }
 
-function PendingTable({ rows, onPass, onReject }: { rows: KnowledgeEntry[]; onPass: (id: string) => void; onReject: (id: string) => void }) {
+function PendingTable({ rows, onPass, onReject, onView }: { rows: KnowledgeEntry[]; onPass: (id: string) => void; onReject: (id: string) => void; onView: (e: KnowledgeEntry) => void }) {
   if (rows.length === 0) return <div className="py-12 text-center text-sm text-muted-foreground">暂无待审核入库申请</div>;
   return (
     <Table>
@@ -72,7 +76,7 @@ function PendingTable({ rows, onPass, onReject }: { rows: KnowledgeEntry[]; onPa
       </TableHeader>
       <TableBody>
         {rows.map((e) => (
-          <TableRow key={e.id}>
+          <TableRow key={e.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onView(e)}>
             <TableCell className="font-mono text-xs">{e.id}</TableCell>
             <TableCell>
               <div className="font-medium">{e.title}</div>
@@ -81,7 +85,7 @@ function PendingTable({ rows, onPass, onReject }: { rows: KnowledgeEntry[]; onPa
             <TableCell><Badge variant="outline">{e.categoryName}</Badge></TableCell>
             <TableCell className="font-mono text-xs text-muted-foreground">{e.sourceIds.join(", ")}</TableCell>
             <TableCell className="text-muted-foreground text-xs">{e.submittedAt}</TableCell>
-            <TableCell className="text-right">
+            <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
               <div className="flex justify-end gap-1">
                 <Button size="sm" className="h-8 gap-1 bg-success hover:bg-success/90 text-white" onClick={() => onPass(e.id)}>
                   <Check className="w-3 h-3" />通过
@@ -98,7 +102,7 @@ function PendingTable({ rows, onPass, onReject }: { rows: KnowledgeEntry[]; onPa
   );
 }
 
-function HistoryTable({ rows, variant, onRestore }: { rows: KnowledgeEntry[]; variant: "approved" | "rejected"; onRestore?: (id: string) => void }) {
+function HistoryTable({ rows, variant, onRestore, onView }: { rows: KnowledgeEntry[]; variant: "approved" | "rejected"; onRestore?: (id: string) => void; onView: (e: KnowledgeEntry) => void }) {
   if (rows.length === 0) return <div className="py-12 text-center text-sm text-muted-foreground">{variant === "approved" ? "暂无已通过入库记录" : "暂无驳回记录"}</div>;
   return (
     <Table>
@@ -111,14 +115,14 @@ function HistoryTable({ rows, variant, onRestore }: { rows: KnowledgeEntry[]; va
       </TableHeader>
       <TableBody>
         {rows.map((e) => (
-          <TableRow key={e.id}>
+          <TableRow key={e.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onView(e)}>
             <TableCell className="font-mono text-xs">{e.id}</TableCell>
             <TableCell className="font-medium">{e.title}</TableCell>
             <TableCell><Badge variant="outline">{e.categoryName}</Badge></TableCell>
             <TableCell className="font-mono text-xs text-muted-foreground">{e.sourceIds.join(", ")}</TableCell>
             <TableCell className="text-muted-foreground text-xs">{e.reviewedAt ?? "—"}</TableCell>
             {onRestore && (
-              <TableCell className="text-right">
+              <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                 <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => onRestore(e.id)}>
                   <RotateCcw className="w-3 h-3" />重新提审
                 </Button>
