@@ -6,6 +6,15 @@ export type EntryKind = "qa" | "session_case" | "ticket_case" | "file";
 export type RiskLevel = "低" | "中" | "高";
 export type DataLevel = "L1" | "L2" | "L3" | "L4";
 export type SyncStatus = "待处理" | "待审核" | "已生效" | "已驳回" | "同步失败";
+export type AuditAction =
+  | "审核通过"
+  | "驳回"
+  | "重新提审"
+  | "移动知识库"
+  | "低置信复核"
+  | "合并重复"
+  | "同步重试"
+  | "删除知识库";
 
 export type KnowledgeLibrary = {
   id: string;
@@ -123,13 +132,27 @@ export type NewKnowledgeEntry = {
   attachments?: { name: string; size: string }[];
 };
 
+export type KnowledgeAuditLog = {
+  id: string;
+  entryId?: string;
+  libraryId?: string;
+  action: AuditAction;
+  operator: string;
+  reason: string;
+  before?: string;
+  after?: string;
+  createdAt: string;
+};
+
 let entries: KnowledgeEntry[] = [];
 let seq = 90000;
 let librarySeq = 1000;
+let auditSeq = 0;
 let customLibraries: Omit<KnowledgeLibrary, "total" | "effective" | "pending" | "lowConfidence">[] =
   [];
 let deletedLibraryIds = new Set<string>();
 let librarySnapshot: KnowledgeLibrary[] = [];
+let auditLogs: KnowledgeAuditLog[] = [];
 const listeners = new Set<() => void>();
 
 const emit = () => {
@@ -142,6 +165,7 @@ const subscribe = (l: () => void) => {
 };
 const getSnapshot = () => entries;
 const getLibrarySnapshot = () => librarySnapshot;
+const getAuditSnapshot = () => auditLogs;
 
 export function useKnowledgeStore() {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
@@ -149,6 +173,10 @@ export function useKnowledgeStore() {
 
 export function useKnowledgeLibraries() {
   return useSyncExternalStore(subscribe, getLibrarySnapshot, getLibrarySnapshot);
+}
+
+export function useKnowledgeAuditLogs() {
+  return useSyncExternalStore(subscribe, getAuditSnapshot, getAuditSnapshot);
 }
 
 export function addKnowledgeEntry(e: NewKnowledgeEntry) {
@@ -171,6 +199,13 @@ export function addKnowledgeEntry(e: NewKnowledgeEntry) {
     submittedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
   };
   entries = [entry, ...entries];
+  appendAuditLog({
+    entryId: entry.id,
+    libraryId: entry.targetLibraryId,
+    action: "重新提审",
+    reason: `${entry.sourceSystem} 产生候选知识`,
+    after: entry.syncStatus,
+  });
   emit();
   return entry;
 }
@@ -201,6 +236,7 @@ export function addKnowledgeLibrary(library: NewKnowledgeLibrary) {
 
 export function moveKnowledgeEntry(id: string, targetLibraryId: string) {
   const targetLibraryName = libraryName(targetLibraryId);
+  const before = entries.find((entry) => entry.id === id);
   entries = entries.map((entry) =>
     entry.id === id
       ? {
@@ -212,6 +248,16 @@ export function moveKnowledgeEntry(id: string, targetLibraryId: string) {
         }
       : entry,
   );
+  if (before) {
+    appendAuditLog({
+      entryId: id,
+      libraryId: targetLibraryId,
+      action: "移动知识库",
+      reason: "知识管理员调整目标知识库",
+      before: before.targetLibraryName,
+      after: targetLibraryName,
+    });
+  }
   emit();
   return entries.find((entry) => entry.id === id);
 }
@@ -240,6 +286,13 @@ export function deleteKnowledgeLibrary(id: string, fallbackLibraryId?: string) {
 
   customLibraries = customLibraries.filter((library) => library.id !== id);
   deletedLibraryIds = new Set([...deletedLibraryIds, id]);
+  appendAuditLog({
+    libraryId: id,
+    action: "删除知识库",
+    reason: `删除知识库并将条目迁移至${fallback.name}`,
+    before: libraryName(id),
+    after: fallback.name,
+  });
   emit();
   return {
     ...fallback,
@@ -260,18 +313,126 @@ export function deleteKnowledgeLibrary(id: string, fallbackLibraryId?: string) {
   };
 }
 
-export function setEntryStatus(id: string, status: ReviewStatus) {
+export function setEntryStatus(
+  id: string,
+  status: ReviewStatus,
+  options?: { reason?: string; reviewer?: string },
+) {
+  const before = entries.find((e) => e.id === id);
   entries = entries.map((e) =>
     e.id === id
       ? {
           ...e,
           status,
           syncStatus: status === "已通过" ? "已生效" : status === "已驳回" ? "已驳回" : "待审核",
+          reviewReason: options?.reason ?? e.reviewReason,
           reviewedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
         }
       : e,
   );
+  if (before) {
+    appendAuditLog({
+      entryId: id,
+      libraryId: before.targetLibraryId,
+      action: status === "已通过" ? "审核通过" : status === "已驳回" ? "驳回" : "重新提审",
+      operator: options?.reviewer ?? "知识管理员",
+      reason: options?.reason ?? status,
+      before: `${before.status} / ${before.syncStatus}`,
+      after: `${status} / ${
+        status === "已通过" ? "已生效" : status === "已驳回" ? "已驳回" : "待审核"
+      }`,
+    });
+  }
   emit();
+}
+
+export function markLowConfidenceReview(id: string, reason: string) {
+  const before = entries.find((entry) => entry.id === id);
+  entries = entries.map((entry) =>
+    entry.id === id
+      ? {
+          ...entry,
+          status: "审核中",
+          syncStatus: "待审核",
+          confidence: Math.min(entry.confidence, 0.25),
+          reviewReason: reason,
+        }
+      : entry,
+  );
+  if (before) {
+    appendAuditLog({
+      entryId: id,
+      libraryId: before.targetLibraryId,
+      action: "低置信复核",
+      reason,
+      before: `${Math.round(before.confidence * 100)}%`,
+      after: "25%",
+    });
+  }
+  emit();
+  return entries.find((entry) => entry.id === id);
+}
+
+export function retryKnowledgeSync(id: string) {
+  const before = entries.find((entry) => entry.id === id);
+  if (!before) return null;
+  entries = entries.map((entry) =>
+    entry.id === id
+      ? {
+          ...entry,
+          status: "已通过",
+          syncStatus: "已生效",
+          reviewReason: `${entry.reviewReason ?? "同步重试"}；已重试同步 AI 检索索引`,
+        }
+      : entry,
+  );
+  appendAuditLog({
+    entryId: id,
+    libraryId: before.targetLibraryId,
+    action: "同步重试",
+    reason: "审核通过后同步索引失败，管理员手动重试",
+    before: before.syncStatus,
+    after: "已生效",
+  });
+  emit();
+  return entries.find((entry) => entry.id === id);
+}
+
+export function mergeKnowledgeEntry(sourceId: string, targetId: string) {
+  const source = entries.find((entry) => entry.id === sourceId);
+  const target = entries.find((entry) => entry.id === targetId);
+  if (!source || !target || source.id === target.id) return null;
+
+  const mergedSourceIds = Array.from(new Set([...target.sourceIds, ...source.sourceIds]));
+  entries = entries.map((entry) => {
+    if (entry.id === target.id) {
+      return {
+        ...entry,
+        sourceIds: mergedSourceIds,
+        duplicateHint: `已合并重复候选：${source.id} ${source.title}`,
+        reviewReason: `${entry.reviewReason ?? "重复合并"}；已合并 ${source.id}`,
+      };
+    }
+    if (entry.id === source.id) {
+      return {
+        ...entry,
+        status: "已驳回",
+        syncStatus: "已驳回",
+        reviewReason: `重复内容已合并至 ${target.id}，旧候选关闭`,
+      };
+    }
+    return entry;
+  });
+  appendAuditLog({
+    entryId: source.id,
+    libraryId: target.targetLibraryId,
+    action: "合并重复",
+    reason: "审核时发现与已有知识重复，保留来源关系并关闭旧候选",
+    before: source.id,
+    after: target.id,
+  });
+  emit();
+  return entries.find((entry) => entry.id === target.id);
 }
 
 /** Latest review status for a given source (session/ticket) id. */
@@ -645,6 +806,20 @@ function entryKindForSource(sourceType: SourceType): EntryKind {
   return "session_case";
 }
 
+function appendAuditLog(
+  log: Omit<KnowledgeAuditLog, "id" | "operator" | "createdAt"> & { operator?: string },
+) {
+  auditLogs = [
+    {
+      id: `AUD-${++auditSeq}`,
+      operator: log.operator ?? "知识管理员",
+      createdAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+      ...log,
+    },
+    ...auditLogs,
+  ].slice(0, 80);
+}
+
 function allLibraryBases() {
   return [...customLibraries, ...libraryBases].filter(
     (library) => !deletedLibraryIds.has(library.id),
@@ -789,7 +964,7 @@ function seed() {
       content: m.summary,
       tags: c.name,
       status: "已通过",
-      syncStatus: "已生效",
+      syncStatus: i === 0 ? "同步失败" : "已生效",
       initialConfidence: m.sourceType === "file" ? 0.5 : 0.8,
       confidence: m.confidence,
       riskLevel: m.confidence < 0.3 ? "高" : "低",
@@ -802,12 +977,39 @@ function seed() {
       caseSummary: m.summary,
       actions:
         m.sourceType === "file" ? "系统解析 ERP 文件并生成摘要。" : "知识运营手动维护标准答案。",
-      result: m.confidence < 0.3 ? "进入低置信度复核队列。" : "已发布至正式知识库。",
+      result:
+        i === 0
+          ? "审核已通过，但同步 AI 检索索引失败，需要管理员重试。"
+          : m.confidence < 0.3
+            ? "进入低置信度复核队列。"
+            : "已发布至正式知识库。",
       reviewReason: m.reviewReason,
       slaDueAt: ts(i + 1),
     });
   });
   entries = [...list, ...entries];
+  auditLogs = list
+    .filter((entry) => entry.status !== "审核中" || entry.syncStatus === "同步失败")
+    .slice(0, 8)
+    .map((entry) => ({
+      id: `AUD-${++auditSeq}`,
+      entryId: entry.id,
+      libraryId: entry.targetLibraryId,
+      action:
+        entry.syncStatus === "同步失败"
+          ? ("同步重试" as const)
+          : entry.status === "已驳回"
+            ? ("驳回" as const)
+            : ("审核通过" as const),
+      operator: "知识管理员",
+      reason:
+        entry.syncStatus === "同步失败"
+          ? "索引同步失败待重试"
+          : (entry.reviewReason ?? entry.status),
+      before: "待审核",
+      after: `${entry.status} / ${entry.syncStatus}`,
+      createdAt: entry.reviewedAt ?? entry.submittedAt,
+    }));
   librarySnapshot = summarizeLibraries();
 }
 seed();

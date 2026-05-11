@@ -44,9 +44,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowDownToLine,
   BookOpen,
+  Check,
   DatabaseZap,
   FileText,
   FilePlus2,
+  GitMerge,
+  History,
   LibraryBig,
   MessagesSquare,
   MoveRight,
@@ -56,17 +59,23 @@ import {
   Trash2,
   UploadCloud,
   X,
+  XCircle,
 } from "lucide-react";
 import {
   addKnowledgeEntry,
   addKnowledgeLibrary,
   deleteKnowledgeLibrary,
+  markLowConfidenceReview,
+  mergeKnowledgeEntry,
   moveKnowledgeEntry,
+  retryKnowledgeSync,
   setEntryStatus,
+  useKnowledgeAuditLogs,
   useKnowledgeLibraries,
   useKnowledgeStore,
   type KnowledgeEntry,
   type KnowledgeLibrary,
+  type KnowledgeAuditLog,
   type NewKnowledgeEntry,
 } from "@/lib/knowledge-store";
 import { EntryDetailDialog } from "@/components/knowledge/EntryDetailDialog";
@@ -77,12 +86,15 @@ export const Route = createFileRoute("/knowledge")({ component: Page });
 function Page() {
   const libraries = useKnowledgeLibraries();
   const entries = useKnowledgeStore();
+  const auditLogs = useKnowledgeAuditLogs();
   const [activeLibraryId, setActiveLibraryId] = useState(libraries[0]?.id ?? "kb-product-usage");
   const [query, setQuery] = useState("");
   const [detail, setDetail] = useState<KnowledgeEntry | null>(null);
   const [creatingLibrary, setCreatingLibrary] = useState(false);
   const [creatingKnowledge, setCreatingKnowledge] = useState(false);
   const [movingEntry, setMovingEntry] = useState<KnowledgeEntry | null>(null);
+  const [rejectingEntry, setRejectingEntry] = useState<KnowledgeEntry | null>(null);
+  const [mergingEntry, setMergingEntry] = useState<KnowledgeEntry | null>(null);
   const [deletingLibrary, setDeletingLibrary] = useState(false);
 
   const activeLibrary = libraries.find((library) => library.id === activeLibraryId) ?? libraries[0];
@@ -109,14 +121,67 @@ function Page() {
 
   const effective = scopedEntries.filter((entry) => entry.status === "已通过");
   const pending = scopedEntries.filter((entry) => entry.status === "审核中");
+  const rejected = scopedEntries.filter((entry) => entry.status === "已驳回");
+  const syncFailed = scopedEntries.filter((entry) => entry.syncStatus === "同步失败");
   const lowConfidence = scopedEntries.filter(
     (entry) => entry.confidence < 0.3 || entry.reviewReason?.includes("低置信度"),
   );
+  const scopedAuditLogs = auditLogs.filter(
+    (log) =>
+      log.libraryId === activeLibraryId || scopedEntries.some((entry) => entry.id === log.entryId),
+  );
 
   const markLowReviewed = (entry: KnowledgeEntry) => {
-    setEntryStatus(entry.id, "审核中");
+    markLowConfidenceReview(entry.id, "被点踩或命中后转人工率较高，标记低置信复核");
     toast.success("已送入低置信度复核队列", {
       description: `${entry.title} 将由知识库管理员重新确认内容与元数据`,
+    });
+  };
+
+  const approveEntry = (entry: KnowledgeEntry) => {
+    setEntryStatus(entry.id, "已通过", { reason: "公共知识库审核通过" });
+    toast.success("已通过并同步正式知识库", {
+      description: `${entry.title} 已进入 AI 检索索引`,
+    });
+  };
+
+  const rejectEntry = (entry: KnowledgeEntry, reason: string) => {
+    setEntryStatus(entry.id, "已驳回", { reason });
+    setRejectingEntry(null);
+    toast.success("已驳回该知识", {
+      description: reason,
+    });
+  };
+
+  const restoreEntry = (entry: KnowledgeEntry) => {
+    setEntryStatus(entry.id, "审核中", { reason: "被驳回后重新提审" });
+    toast.success("已重新提审", {
+      description: `${entry.title} 已回到待审核列表`,
+    });
+  };
+
+  const retrySync = (entry: KnowledgeEntry) => {
+    const synced = retryKnowledgeSync(entry.id);
+    if (!synced) {
+      toast.error("同步重试失败，请刷新后重试");
+      return;
+    }
+    toast.success("同步索引已重试成功", {
+      description: `${synced.title} 已恢复为已生效`,
+    });
+  };
+
+  const mergeEntry = (source: KnowledgeEntry, targetId: string) => {
+    const merged = mergeKnowledgeEntry(source.id, targetId);
+    if (!merged) {
+      toast.error("合并失败", {
+        description: "请选择有效的目标知识",
+      });
+      return;
+    }
+    setMergingEntry(null);
+    toast.success("已合并重复知识", {
+      description: `来源已保留到 ${merged.id}`,
     });
   };
 
@@ -270,27 +335,71 @@ function Page() {
           </div>
 
           <Tabs defaultValue="effective" className="p-4">
-            <TabsList>
+            <TabsList className="h-auto flex-wrap justify-start">
               <TabsTrigger value="effective">已生效 ({effective.length})</TabsTrigger>
               <TabsTrigger value="pending">待审核 ({pending.length})</TabsTrigger>
+              <TabsTrigger value="rejected">已驳回 ({rejected.length})</TabsTrigger>
+              <TabsTrigger value="sync">同步失败 ({syncFailed.length})</TabsTrigger>
               <TabsTrigger value="low" className="gap-1">
                 <ShieldAlert className="w-3.5 h-3.5" />
                 低置信度复核 ({lowConfidence.length})
               </TabsTrigger>
+              <TabsTrigger value="audit" className="gap-1">
+                <History className="w-3.5 h-3.5" />
+                审计记录 ({scopedAuditLogs.length})
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="effective">
-              <EntryTable rows={effective} onView={setDetail} onMove={setMovingEntry} />
+              <EntryTable
+                rows={effective}
+                onView={setDetail}
+                onMove={setMovingEntry}
+                onLowReview={markLowReviewed}
+                onRetrySync={retrySync}
+                onMerge={setMergingEntry}
+              />
             </TabsContent>
             <TabsContent value="pending">
-              <EntryTable rows={pending} onView={setDetail} onMove={setMovingEntry} />
+              <EntryTable
+                rows={pending}
+                onView={setDetail}
+                onMove={setMovingEntry}
+                onApprove={approveEntry}
+                onReject={setRejectingEntry}
+                onMerge={setMergingEntry}
+              />
+            </TabsContent>
+            <TabsContent value="rejected">
+              <EntryTable
+                rows={rejected}
+                onView={setDetail}
+                onMove={setMovingEntry}
+                onRestore={restoreEntry}
+                onMerge={setMergingEntry}
+              />
+            </TabsContent>
+            <TabsContent value="sync">
+              <EntryTable
+                rows={syncFailed}
+                onView={setDetail}
+                onMove={setMovingEntry}
+                onRetrySync={retrySync}
+              />
             </TabsContent>
             <TabsContent value="low">
               <EntryTable
                 rows={lowConfidence}
                 onView={setDetail}
                 onMove={setMovingEntry}
-                onReview={markLowReviewed}
+                onLowReview={markLowReviewed}
+                onApprove={approveEntry}
+                onReject={setRejectingEntry}
+                onRetrySync={retrySync}
+                onMerge={setMergingEntry}
               />
+            </TabsContent>
+            <TabsContent value="audit">
+              <AuditLogPanel logs={scopedAuditLogs} />
             </TabsContent>
           </Tabs>
         </section>
@@ -319,6 +428,19 @@ function Page() {
         onOpenChange={(open) => !open && setMovingEntry(null)}
         onMoved={handleKnowledgeMoved}
       />
+      <RejectKnowledgeDialog
+        open={!!rejectingEntry}
+        entry={rejectingEntry}
+        onOpenChange={(open) => !open && setRejectingEntry(null)}
+        onRejected={rejectEntry}
+      />
+      <MergeKnowledgeDialog
+        open={!!mergingEntry}
+        entry={mergingEntry}
+        entries={entries}
+        onOpenChange={(open) => !open && setMergingEntry(null)}
+        onMerged={mergeEntry}
+      />
       <DeleteLibraryDialog
         open={deletingLibrary}
         library={activeLibrary}
@@ -334,12 +456,22 @@ function EntryTable({
   rows,
   onView,
   onMove,
-  onReview,
+  onApprove,
+  onReject,
+  onRestore,
+  onLowReview,
+  onRetrySync,
+  onMerge,
 }: {
   rows: KnowledgeEntry[];
   onView: (entry: KnowledgeEntry) => void;
   onMove: (entry: KnowledgeEntry) => void;
-  onReview?: (entry: KnowledgeEntry) => void;
+  onApprove?: (entry: KnowledgeEntry) => void;
+  onReject?: (entry: KnowledgeEntry) => void;
+  onRestore?: (entry: KnowledgeEntry) => void;
+  onLowReview?: (entry: KnowledgeEntry) => void;
+  onRetrySync?: (entry: KnowledgeEntry) => void;
+  onMerge?: (entry: KnowledgeEntry) => void;
 }) {
   if (rows.length === 0) {
     return (
@@ -403,6 +535,49 @@ function EntryTable({
                 <Button size="sm" variant="ghost" className="h-8" onClick={() => onView(entry)}>
                   查看
                 </Button>
+                {onApprove && entry.status === "审核中" && (
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1 bg-success text-white hover:bg-success/90"
+                    onClick={() => onApprove(entry)}
+                  >
+                    <Check className="w-3 h-3" />
+                    通过
+                  </Button>
+                )}
+                {onReject && entry.status === "审核中" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={() => onReject(entry)}
+                  >
+                    <XCircle className="w-3 h-3" />
+                    驳回
+                  </Button>
+                )}
+                {onRestore && entry.status === "已驳回" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1"
+                    onClick={() => onRestore(entry)}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    重新提审
+                  </Button>
+                )}
+                {onRetrySync && entry.syncStatus === "同步失败" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1"
+                    onClick={() => onRetrySync(entry)}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    重试同步
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -412,14 +587,25 @@ function EntryTable({
                   <MoveRight className="w-3 h-3" />
                   移动
                 </Button>
-                {onReview && (
+                {onMerge && entry.duplicateHint && (
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-8 gap-1"
-                    onClick={() => onReview(entry)}
+                    onClick={() => onMerge(entry)}
                   >
-                    <RefreshCw className="w-3 h-3" />
+                    <GitMerge className="w-3 h-3" />
+                    合并
+                  </Button>
+                )}
+                {onLowReview && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1"
+                    onClick={() => onLowReview(entry)}
+                  >
+                    <ArrowDownToLine className="w-3 h-3" />
                     复核
                   </Button>
                 )}
@@ -450,6 +636,43 @@ function Confidence({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   const cls = pct >= 70 ? "text-success" : pct >= 50 ? "text-warning" : "text-destructive";
   return <span className={`font-medium ${cls}`}>{pct}%</span>;
+}
+
+function AuditLogPanel({ logs }: { logs: KnowledgeAuditLog[] }) {
+  if (logs.length === 0) {
+    return <div className="py-12 text-center text-sm text-muted-foreground">暂无审计记录</div>;
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>时间</TableHead>
+          <TableHead>动作</TableHead>
+          <TableHead>对象</TableHead>
+          <TableHead>原因</TableHead>
+          <TableHead>变更</TableHead>
+          <TableHead>操作人</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {logs.map((log) => (
+          <TableRow key={log.id}>
+            <TableCell className="text-xs text-muted-foreground">{log.createdAt}</TableCell>
+            <TableCell>
+              <Badge variant="outline">{log.action}</Badge>
+            </TableCell>
+            <TableCell className="font-mono text-xs">{log.entryId ?? log.libraryId}</TableCell>
+            <TableCell className="max-w-[280px] truncate text-sm">{log.reason}</TableCell>
+            <TableCell className="text-xs text-muted-foreground">
+              {(log.before ?? "—") + " → " + (log.after ?? "—")}
+            </TableCell>
+            <TableCell className="text-sm">{log.operator}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
 }
 
 function MoveKnowledgeDialog({
@@ -530,6 +753,150 @@ function MoveKnowledgeDialog({
           </Button>
           <Button onClick={submit} disabled={targetLibraries.length === 0}>
             确认移动
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RejectKnowledgeDialog({
+  open,
+  entry,
+  onOpenChange,
+  onRejected,
+}: {
+  open: boolean;
+  entry: KnowledgeEntry | null;
+  onOpenChange: (open: boolean) => void;
+  onRejected: (entry: KnowledgeEntry, reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+
+  useEffect(() => {
+    if (open) setReason("");
+  }, [open, entry?.id]);
+
+  if (!entry) return null;
+
+  const submit = () => {
+    if (!reason.trim()) {
+      toast.error("驳回原因不能为空。");
+      return;
+    }
+    onRejected(entry, reason.trim());
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>驳回知识</DialogTitle>
+          <DialogDescription>
+            驳回「{entry.title}」前请填写原因，便于后续重新提审或合并重复知识。
+          </DialogDescription>
+        </DialogHeader>
+        <Field label="驳回原因">
+          <Textarea
+            rows={4}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="例如：结论不完整、涉及高风险个案、疑似重复或未完成脱敏"
+          />
+        </Field>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button variant="destructive" onClick={submit}>
+            确认驳回
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MergeKnowledgeDialog({
+  open,
+  entry,
+  entries,
+  onOpenChange,
+  onMerged,
+}: {
+  open: boolean;
+  entry: KnowledgeEntry | null;
+  entries: KnowledgeEntry[];
+  onOpenChange: (open: boolean) => void;
+  onMerged: (entry: KnowledgeEntry, targetId: string) => void;
+}) {
+  const candidates = useMemo(
+    () =>
+      entries.filter(
+        (item) =>
+          item.id !== entry?.id &&
+          item.targetLibraryId === entry?.targetLibraryId &&
+          item.status === "已通过",
+      ),
+    [entry?.id, entry?.targetLibraryId, entries],
+  );
+  const [targetId, setTargetId] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setTargetId(candidates[0]?.id ?? "");
+  }, [open, entry?.id, candidates]);
+
+  if (!entry) return null;
+
+  const submit = () => {
+    if (!targetId) {
+      toast.error("请选择要合并到的正式知识");
+      return;
+    }
+    onMerged(entry, targetId);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>合并重复知识</DialogTitle>
+          <DialogDescription>
+            将当前候选关闭，并把来源关系合并到已有正式知识，避免重复污染知识库。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-md border bg-muted/40 p-3 text-sm">
+            <div className="font-medium">{entry.title}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{entry.duplicateHint}</div>
+          </div>
+          <Field label="合并到">
+            <Select value={targetId} onValueChange={setTargetId}>
+              <SelectTrigger>
+                <SelectValue placeholder="选择已有正式知识" />
+              </SelectTrigger>
+              <SelectContent>
+                {candidates.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.id} · {candidate.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          {candidates.length === 0 && (
+            <div className="rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+              当前知识库暂无可合并的已生效知识，请先通过或移动目标知识。
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button onClick={submit} disabled={candidates.length === 0}>
+            确认合并
           </Button>
         </DialogFooter>
       </DialogContent>

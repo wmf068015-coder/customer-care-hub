@@ -24,6 +24,9 @@ import {
   ShieldCheck,
   Gauge,
   LibraryBig,
+  Sparkles,
+  ListChecks,
+  MessageSquareText,
 } from "lucide-react";
 import type { KnowledgeEntry, DialogMessage } from "@/lib/knowledge-store";
 
@@ -46,6 +49,9 @@ export function EntryDetailDialog({
   if (!entry) return null;
   const isSession = entry.sourceType === "session";
   const isTicket = entry.sourceType === "ticket";
+  const aiQuestion = entry.question ?? entry.messages?.find((m) => m.role === "user")?.text;
+  const aiAnswer = entry.answer ?? entry.content;
+  const sopSteps = splitSop(entry.actions);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -92,7 +98,30 @@ export function EntryDetailDialog({
           <InfoRow icon={Clock} label="时间" value={entry.conversationAt ?? entry.submittedAt} />
         </div>
 
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <ProcessStep index="1" label={isTicket ? "原始工单详情已提交" : "原始详细对话已提交"} />
+          <ProcessStep index="2" label="AI 已提炼标题、摘要、QA、SOP" />
+          <ProcessStep
+            index="3"
+            label={entry.status === "已通过" ? "审核完成并入库" : "等待入库审核"}
+          />
+        </div>
+
         <div className="grid grid-cols-1 gap-2 rounded-md border p-3 text-xs">
+          <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+            <Sparkles className="w-4 h-4 text-primary" />
+            AI 提炼结果
+          </div>
+          <ReviewLine label="标题摘要" value={`${entry.title}：${entry.summary}`} />
+          <ReviewLine label="具体 QA" value={`Q：${aiQuestion ?? entry.title}\nA：${aiAnswer}`} />
+          <ReviewLine
+            label="具体 SOP"
+            value={
+              sopSteps.length > 0
+                ? sopSteps.map((step, i) => `${i + 1}. ${step}`).join("\n")
+                : "等待 AI 补充 SOP"
+            }
+          />
           <div className="flex items-center gap-2 text-muted-foreground">
             <Badge variant="outline" className="font-mono">
               {isTicket ? "scene_id" : "scene"}
@@ -128,7 +157,14 @@ export function EntryDetailDialog({
         )}
 
         <div className="flex-1 min-h-0">
-          <div className="text-xs font-medium text-muted-foreground mb-2">详细对话</div>
+          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            {isTicket ? (
+              <ListChecks className="w-3.5 h-3.5" />
+            ) : (
+              <MessageSquareText className="w-3.5 h-3.5" />
+            )}
+            {isTicket ? "原始工单详情" : "原始详细对话"}
+          </div>
           <ScrollArea className="h-[320px] rounded-md border p-3">
             <div className="space-y-3">
               {(entry.messages ?? []).length === 0 && (
@@ -172,6 +208,17 @@ export function EntryDetailDialog({
   );
 }
 
+function ProcessStep({ index, label }: { index: string; label: string }) {
+  return (
+    <div className="rounded-md border bg-muted/30 px-3 py-2">
+      <div className="mb-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+        {index}
+      </div>
+      <div className="font-medium leading-snug">{label}</div>
+    </div>
+  );
+}
+
 function InfoRow({
   icon: Icon,
   label,
@@ -194,7 +241,14 @@ function ReviewLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[72px_1fr] gap-2">
       <span className="font-medium text-muted-foreground">{label}</span>
-      <span className="text-foreground">{value}</span>
+      <span className="whitespace-pre-line text-foreground">{value}</span>
     </div>
   );
+}
+
+function splitSop(actions?: string) {
+  return (actions ?? "")
+    .split(/[；;\n]/)
+    .map((step) => step.trim())
+    .filter(Boolean);
 }

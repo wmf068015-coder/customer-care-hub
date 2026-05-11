@@ -24,6 +24,9 @@ const checks = [
       "addKnowledgeLibrary",
       "moveKnowledgeEntry",
       "deleteKnowledgeLibrary",
+      "retryKnowledgeSync",
+      "mergeKnowledgeEntry",
+      "KnowledgeAuditLog",
     ],
   },
   {
@@ -47,19 +50,40 @@ const checks = [
       "文件上传自动拆解",
       "PDF 文件",
       "对话文件",
+      "同步失败",
+      "重试同步",
+      "合并重复知识",
+      "审计记录",
     ],
   },
   {
     file: "src/routes/sessions.tsx",
-    patterns: ["客服工作台对话审核入库", "场景块", "初始置信度", "目标知识库"],
+    patterns: [
+      "客服工作台对话审核入库",
+      "原始详细对话",
+      "AI提炼结果",
+      "具体 QA",
+      "具体 SOP",
+      "入库审核",
+    ],
   },
   {
     file: "src/routes/tickets.tsx",
-    patterns: ["ERP 工单审核入库", "scene_id", "附件", "初始置信度"],
+    patterns: ["ERP 工单审核入库", "原始工单详情", "AI提炼结果", "具体 QA", "具体 SOP", "入库审核"],
   },
   {
     file: "src/components/knowledge/EntryDetailDialog.tsx",
-    patterns: ["Case", "Actions", "Result", "数据治理", "目标知识库"],
+    patterns: [
+      "Case",
+      "Actions",
+      "Result",
+      "数据治理",
+      "目标知识库",
+      "原始详细对话",
+      "AI 提炼结果",
+      "具体 QA",
+      "具体 SOP",
+    ],
   },
 ];
 

@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Check, X, ExternalLink, RotateCcw } from "lucide-react";
+import { Check, X, ExternalLink, RotateCcw, Sparkles, MessageSquareText } from "lucide-react";
 import {
   useKnowledgeStore,
   setEntryStatus,
@@ -46,7 +46,7 @@ function Page() {
     <div>
       <PageHeader
         title="客服工作台对话审核入库"
-        description="审核客服工作台推送的对话场景块，确认 Case / Actions / Result 后入库给 AI 客服使用"
+        description="先提交客服工作台原始详细对话，AI 提炼标题摘要、具体 QA、具体 SOP 和基本信息后，再进入入库审核"
         actions={
           <Button variant="outline" asChild className="gap-2">
             <a href="https://zen-desk-assist.lovable.app/" target="_blank" rel="noreferrer">
@@ -57,13 +57,26 @@ function Page() {
         }
       />
       <div className="grid grid-cols-4 gap-3 mb-4">
-        <SummaryCard label="待审核场景块" value={pending.length} tone="warning" />
-        <SummaryCard label="已入库对话知识" value={approved.length} tone="success" />
+        <SummaryCard label="原始详细对话已提交" value={all.length} tone="info" />
+        <SummaryCard label="AI提炼结果待审核" value={pending.length} tone="warning" />
+        <SummaryCard label="审核完成已入库" value={approved.length} tone="success" />
         <SummaryCard label="待合并/驳回" value={rejected.length} tone="destructive" />
-        <SummaryCard
-          label="平均初始置信度"
-          value={`${Math.round(avg(all.map((e) => e.initialConfidence)) * 100)}%`}
-          tone="info"
+      </div>
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <FlowCard
+          step="1"
+          title="提交原始对话"
+          body="客服工作台先提交原始详细对话、来源会话 ID、场景块和客户上下文。"
+        />
+        <FlowCard
+          step="2"
+          title="AI提炼结果"
+          body="AI 生成标题摘要、具体 QA、具体 SOP、Case / Actions / Result 和目标知识库建议。"
+        />
+        <FlowCard
+          step="3"
+          title="入库审核"
+          body={`管理员查看原始对话和 AI 处理结果后审核，平均初始置信度 ${Math.round(avg(all.map((e) => e.initialConfidence)) * 100)}%。`}
         />
       </div>
       <div className="bg-card rounded-lg border shadow-[var(--shadow-card)] p-4">
@@ -136,9 +149,10 @@ function PendingTable({
       <TableHeader>
         <TableRow>
           <TableHead>申请 ID</TableHead>
-          <TableHead>标题 / 场景块</TableHead>
+          <TableHead>原始详细对话</TableHead>
+          <TableHead>AI提炼结果</TableHead>
           <TableHead>目标知识库</TableHead>
-          <TableHead>来源会话</TableHead>
+          <TableHead>入库审核</TableHead>
           <TableHead>初始置信度</TableHead>
           <TableHead>提交时间</TableHead>
           <TableHead className="text-right">操作</TableHead>
@@ -153,8 +167,13 @@ function PendingTable({
           >
             <TableCell className="font-mono text-xs">{e.id}</TableCell>
             <TableCell>
-              <div className="font-medium">{e.title}</div>
-              <div className="text-xs text-muted-foreground line-clamp-1">{e.summary}</div>
+              <div className="flex items-center gap-1.5 font-medium">
+                <MessageSquareText className="w-3.5 h-3.5 text-primary" />
+                {e.sourceIds.join(", ")}
+              </div>
+              <div className="text-xs text-muted-foreground line-clamp-1">
+                原始详细对话已提交，可查看完整聊天记录
+              </div>
               <div className="mt-1 flex flex-wrap gap-1">
                 <Badge variant="outline" className="font-mono text-[10px]">
                   场景块 {e.sceneId}
@@ -165,13 +184,16 @@ function PendingTable({
               </div>
             </TableCell>
             <TableCell>
+              <AiResultPreview entry={e} />
+            </TableCell>
+            <TableCell>
               <div className="space-y-1">
                 <Badge variant="outline">{e.targetLibraryName}</Badge>
                 <div className="text-xs text-muted-foreground">{e.categoryName}</div>
               </div>
             </TableCell>
-            <TableCell className="font-mono text-xs text-muted-foreground">
-              {e.sourceIds.join(", ")}
+            <TableCell>
+              <Badge className="bg-warning/15 text-warning hover:bg-warning/15">待入库审核</Badge>
             </TableCell>
             <TableCell>
               <Confidence value={e.initialConfidence} />
@@ -179,6 +201,9 @@ function PendingTable({
             <TableCell className="text-muted-foreground text-xs">{e.submittedAt}</TableCell>
             <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
               <div className="flex justify-end gap-1">
+                <Button size="sm" variant="ghost" className="h-8" onClick={() => onView(e)}>
+                  查看原文/AI结果
+                </Button>
                 <Button
                   size="sm"
                   className="h-8 gap-1 bg-success hover:bg-success/90 text-white"
@@ -228,9 +253,9 @@ function HistoryTable({
       <TableHeader>
         <TableRow>
           <TableHead>申请 ID</TableHead>
-          <TableHead>标题</TableHead>
+          <TableHead>AI提炼结果</TableHead>
           <TableHead>目标知识库</TableHead>
-          <TableHead>来源会话</TableHead>
+          <TableHead>原始详细对话</TableHead>
           <TableHead>审核时间</TableHead>
           {onRestore && <TableHead className="text-right">操作</TableHead>}
         </TableRow>
@@ -243,12 +268,17 @@ function HistoryTable({
             onClick={() => onView(e)}
           >
             <TableCell className="font-mono text-xs">{e.id}</TableCell>
-            <TableCell className="font-medium">{e.title}</TableCell>
+            <TableCell>
+              <AiResultPreview entry={e} />
+            </TableCell>
             <TableCell>
               <Badge variant="outline">{e.targetLibraryName}</Badge>
             </TableCell>
-            <TableCell className="font-mono text-xs text-muted-foreground">
-              {e.sourceIds.join(", ")}
+            <TableCell>
+              <div className="font-mono text-xs text-muted-foreground">
+                {e.sourceIds.join(", ")}
+              </div>
+              <div className="text-xs text-muted-foreground">原始详细对话可查看</div>
             </TableCell>
             <TableCell className="text-muted-foreground text-xs">{e.reviewedAt ?? "—"}</TableCell>
             {onRestore && (
@@ -268,6 +298,41 @@ function HistoryTable({
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+function FlowCard({ step, title, body }: { step: string; title: string; body: string }) {
+  return (
+    <div className="rounded-lg border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+        {step}
+      </div>
+      <div className="font-medium">{title}</div>
+      <div className="mt-1 text-xs leading-5 text-muted-foreground">{body}</div>
+    </div>
+  );
+}
+
+function AiResultPreview({ entry }: { entry: KnowledgeEntry }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5 font-medium">
+        <Sparkles className="w-3.5 h-3.5 text-primary" />
+        {entry.title}
+      </div>
+      <div className="line-clamp-1 text-xs text-muted-foreground">{entry.summary}</div>
+      <div className="flex flex-wrap gap-1">
+        <Badge variant="outline" className="text-[10px]">
+          具体 QA
+        </Badge>
+        <Badge variant="outline" className="text-[10px]">
+          具体 SOP
+        </Badge>
+        <Badge variant="secondary" className="text-[10px]">
+          AI处理完成
+        </Badge>
+      </div>
+    </div>
   );
 }
 
